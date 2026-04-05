@@ -6,6 +6,48 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 
 
+CLASS_LABELS = {
+    "critical": "Критический",
+    "control": "Управляющий",
+    "telemetry": "Телеметрия",
+    "background": "Фоновый",
+}
+
+LOAD_LABELS = {
+    "normal": "Нормальная",
+    "high": "Высокая",
+    "overload": "Перегрузка",
+    "emergency": "Аварийная",
+}
+
+COMPONENT_LABELS = {
+    "classification": "Классификация",
+    "crypto": "Крипто",
+    "queue": "Очередь",
+    "tx": "Передача",
+    "ack": "Подтверждение",
+}
+
+
+def _display_class(value: str) -> str:
+    return CLASS_LABELS.get(value, value)
+
+
+def _display_load(value: str) -> str:
+    return LOAD_LABELS.get(value, value)
+
+
+def _display_component(value: str) -> str:
+    return COMPONENT_LABELS.get(value, value)
+
+
+def _display_load_scenario_label(value: str) -> str:
+    if "-" not in value:
+        return value
+    load, scenario = value.split("-", 1)
+    return f"{_display_load(load)} | {scenario}"
+
+
 def build_plots(input_dir: str, output_dir: str) -> Dict[str, str]:
     try:
         import matplotlib
@@ -93,11 +135,12 @@ def _build_single_run_plots(source_dir: Path, target_dir: Path, data_dir: Path, 
         )
 
     if latency_by_class:
-        classes = list(latency_by_class.keys())
+        class_keys = list(latency_by_class.keys())
+        classes = [_display_class(item) for item in class_keys]
         fig, ax = plt.subplots(figsize=(10, 5))
-        ax.boxplot([latency_by_class[item] for item in classes], labels=classes)
-        ax.set_title("Latency Distribution by Class")
-        ax.set_ylabel("Latency (s)")
+        ax.boxplot([latency_by_class[item] for item in class_keys], labels=classes)
+        ax.set_title("Распределение задержки по классам")
+        ax.set_ylabel("Задержка, с")
         plots["latency_distribution"] = _save_figure(fig, target_dir / "latency_distribution", plt)
         _write_csv(data_dir / "latency_distribution.csv", _flatten_group(latency_by_class, "message_class", "latency_s"))
 
@@ -106,9 +149,9 @@ def _build_single_run_plots(source_dir: Path, target_dir: Path, data_dir: Path, 
         cdf_y = [(index + 1) / len(sorted_values) for index in range(len(sorted_values))]
         fig, ax = plt.subplots(figsize=(10, 5))
         ax.plot(sorted_values, cdf_y)
-        ax.set_title("Critical Latency CDF")
-        ax.set_xlabel("Latency (s)")
-        ax.set_ylabel("CDF")
+        ax.set_title("Функция распределения (CDF) задержки критического класса")
+        ax.set_xlabel("Задержка, с")
+        ax.set_ylabel("Функция распределения (CDF)")
         plots["critical_latency_cdf"] = _save_figure(fig, target_dir / "critical_latency_cdf", plt)
         _write_csv(
             data_dir / "critical_latency_cdf.csv",
@@ -121,25 +164,25 @@ def _build_single_run_plots(source_dir: Path, target_dir: Path, data_dir: Path, 
         totals = [float(row["queue_total"]) for row in queue_timeseries]
         fig, ax = plt.subplots(figsize=(10, 5))
         ax.plot(times, totals)
-        ax.set_title("Queue Length Over Time")
-        ax.set_xlabel("Time (s)")
-        ax.set_ylabel("Queued messages")
+        ax.set_title("Длина очереди во времени")
+        ax.set_xlabel("Время, с")
+        ax.set_ylabel("Сообщений в очереди")
         plots["queue_timeseries"] = _save_figure(fig, target_dir / "queue_timeseries", plt)
         _write_csv(data_dir / "queue_timeseries.csv", queue_timeseries)
 
     if deadline_ratio_rows:
         fig, ax = plt.subplots(figsize=(10, 5))
-        classes = [row["message_class"] for row in deadline_ratio_rows]
+        classes = [_display_class(str(row["message_class"])) for row in deadline_ratio_rows]
         ratios = [float(row["deadline_met_ratio"]) for row in deadline_ratio_rows]
         ax.bar(classes, ratios)
         ax.set_ylim(0, 1.05)
-        ax.set_title("Deadline Met Ratio by Class")
-        ax.set_ylabel("Ratio")
+        ax.set_title("Доля сообщений в дедлайне по классам")
+        ax.set_ylabel("Доля")
         plots["deadline_met_ratio"] = _save_figure(fig, target_dir / "deadline_met_ratio", plt)
         _write_csv(data_dir / "deadline_met_ratio.csv", deadline_ratio_rows)
 
     if component_rows:
-        classes = [row["message_class"] for row in component_rows]
+        classes = [_display_class(str(row["message_class"])) for row in component_rows]
         components = [
             ("classification_time_mean_s", "classification"),
             ("crypto_time_mean_s", "crypto"),
@@ -151,35 +194,35 @@ def _build_single_run_plots(source_dir: Path, target_dir: Path, data_dir: Path, 
         bottoms = [0.0] * len(classes)
         for field, label in components:
             values = [float(row[field]) for row in component_rows]
-            ax.bar(classes, values, bottom=bottoms, label=label)
+            ax.bar(classes, values, bottom=bottoms, label=_display_component(label))
             bottoms = [bottom + value for bottom, value in zip(bottoms, values)]
-        ax.set_title("Latency Component Breakdown")
-        ax.set_ylabel("Mean component time (s)")
-        ax.legend()
+        ax.set_title("Разложение задержки по компонентам")
+        ax.set_ylabel("Среднее время компонента, с")
+        ax.legend(title="Компонент")
         plots["latency_components"] = _save_figure(fig, target_dir / "latency_components", plt)
         _write_csv(data_dir / "latency_components.csv", component_rows)
 
     if throughput_rows:
-        classes = [row["message_class"] for row in throughput_rows]
+        classes = [_display_class(str(row["message_class"])) for row in throughput_rows]
         useful = [float(row["useful_bytes"]) for row in throughput_rows]
         wire = [float(row["wire_bytes"]) for row in throughput_rows]
         fig, ax = plt.subplots(figsize=(10, 5))
-        ax.bar(classes, wire, label="wire bytes")
-        ax.bar(classes, useful, label="useful bytes")
-        ax.set_title("Delivered Throughput by Class")
-        ax.set_ylabel("Bytes")
+        ax.bar(classes, wire, label="Полный трафик, байт")
+        ax.bar(classes, useful, label="Полезный трафик, байт")
+        ax.set_title("Пропускная способность доставленных сообщений")
+        ax.set_ylabel("Байт")
         ax.legend()
         plots["throughput_by_class"] = _save_figure(fig, target_dir / "throughput_by_class", plt)
         _write_csv(data_dir / "throughput_by_class.csv", throughput_rows)
 
     if crypto_share_rows:
-        classes = [row["message_class"] for row in crypto_share_rows]
+        classes = [_display_class(str(row["message_class"])) for row in crypto_share_rows]
         values = [float(row["crypto_share_latency_ratio"]) for row in crypto_share_rows]
         fig, ax = plt.subplots(figsize=(10, 5))
         ax.bar(classes, values)
         ax.set_ylim(0, max(values) * 1.2 if values else 1.0)
-        ax.set_title("Crypto Share of Total Latency")
-        ax.set_ylabel("Share")
+        ax.set_title("Доля криптообработки в полной задержке")
+        ax.set_ylabel("Доля")
         plots["crypto_share"] = _save_figure(fig, target_dir / "crypto_share", plt)
         _write_csv(data_dir / "crypto_share.csv", crypto_share_rows)
 
@@ -211,10 +254,10 @@ def _build_batch_plots(source_dir: Path, target_dir: Path, data_dir: Path, plt) 
                         "cdf": cdf,
                     }
                 )
-        ax.set_title("Critical Latency CDF by Scenario")
-        ax.set_xlabel("Latency (s)")
-        ax.set_ylabel("CDF")
-        ax.legend()
+        ax.set_title("CDF задержки критического класса по сценариям")
+        ax.set_xlabel("Задержка, с")
+        ax.set_ylabel("Функция распределения (CDF)")
+        ax.legend(title="Сценарий")
         plots["critical_latency_cdf_by_scenario"] = _save_figure(fig, target_dir / "critical_latency_cdf_by_scenario", plt)
         _write_csv(data_dir / "critical_latency_cdf_by_scenario.csv", critical_cdf_rows)
 
@@ -284,27 +327,27 @@ def _plot_grouped_deadline(rows: List[Dict[str, object]], output_path: Path, plt
         offset_positions = [x + (index - (len(scenario_families) - 1) / 2) * width for x in x_positions]
         ax.bar(offset_positions, values, width=width, label=scenario_family)
     ax.set_xticks(x_positions)
-    ax.set_xticklabels(load_profiles)
+    ax.set_xticklabels([_display_load(item) for item in load_profiles])
     ax.set_ylim(0, 1.05)
-    ax.set_title("Critical Deadline-Met Ratio by Scenario and Load")
-    ax.set_ylabel("Ratio")
-    ax.legend()
+    ax.set_title("Доля критического класса в дедлайне по сценариям и нагрузкам")
+    ax.set_ylabel("Доля")
+    ax.legend(title="Сценарий")
     return _save_figure(fig, output_path, plt)
 
 
 def _plot_component_breakdown(rows: List[Dict[str, object]], output_path: Path, plt) -> str:
-    labels = [str(row["label"]) for row in rows]
+    labels = [_display_load_scenario_label(str(row["label"])) for row in rows]
     components = ["classification", "crypto", "queue", "tx", "ack"]
     fig, ax = plt.subplots(figsize=(12, 6))
     bottoms = [0.0] * len(labels)
     for component in components:
         values = [float(row[component]) for row in rows]
-        ax.bar(labels, values, bottom=bottoms, label=component)
+        ax.bar(labels, values, bottom=bottoms, label=_display_component(component))
         bottoms = [bottom + value for bottom, value in zip(bottoms, values)]
-    ax.set_title("Critical Delay Component Breakdown")
-    ax.set_ylabel("Mean component time (s)")
+    ax.set_title("Разложение задержки критического класса по компонентам")
+    ax.set_ylabel("Среднее время компонента, с")
     ax.tick_params(axis="x", rotation=30)
-    ax.legend()
+    ax.legend(title="Компонент")
     return _save_figure(fig, output_path, plt)
 
 
@@ -323,21 +366,19 @@ def _plot_class_throughput(rows: List[Dict[str, object]], output_path: Path, plt
             )
             values.append(float(matched["useful_throughput_bps"]) if matched else 0.0)
         offset_positions = [x + (index - (len(classes) - 1) / 2) * width for x in x_positions]
-        ax.bar(offset_positions, values, width=width, label=message_class)
+        ax.bar(offset_positions, values, width=width, label=_display_class(message_class))
     ax.set_xticks(x_positions)
-    ax.set_xticklabels(labels, rotation=30)
-    ax.set_title("Useful Throughput by Class and Scenario")
-    ax.set_ylabel("bps")
-    ax.legend()
+    ax.set_xticklabels([_display_load_scenario_label(item) for item in labels], rotation=30)
+    ax.set_title("Полезная пропускная способность по классам и сценариям")
+    ax.set_ylabel("бит/с")
+    ax.legend(title="Класс")
     return _save_figure(fig, output_path, plt)
 
 
 def _save_figure(fig, base_path: Path, plt) -> str:
     png_path = base_path.with_suffix(".png")
-    svg_path = base_path.with_suffix(".svg")
     fig.tight_layout()
     fig.savefig(png_path, dpi=160)
-    fig.savefig(svg_path)
     plt.close(fig)
     return str(png_path)
 

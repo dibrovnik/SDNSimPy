@@ -163,7 +163,10 @@ P^(k) = {(c, prio(c), w(c), prof(c), r_max(c), agg(c), drop(c), auth(c))}
 - `PolicyManager` — [secure_delivery/policy/manager.py](/Users/macbookair/.codex/worktrees/867a/SDNSimPy/secure_delivery/policy/manager.py)
 - `FilePolicyBackend` — [secure_delivery/policy/backends.py](/Users/macbookair/.codex/worktrees/867a/SDNSimPy/secure_delivery/policy/backends.py)
 
-`EvmPolicyBackend` добавлен как интерфейс расширения, но пока оставлен stub-реализацией.
+`EvmPolicyBackend` полноценно внедрен. Шлюз динамически скачивает JSON-манифесты политик (включающие приоритизацию и профили защиты) из смарт-контракта EVM-совместимого блокчейна.
+Для обеспечения автономности в условиях *ненадежной связи*:
+1. Внедрен механизм *Exponential Backoff* (увеличение задержек при недоступности RPC).
+2. Политика валидируется и локально кешируется. Если контракт стал полностью недоступен, агенты "выживают" на закэшированном профиле до восстановления сети.
 
 ## Anti-replay
 
