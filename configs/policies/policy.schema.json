@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Secure Delivery Policy Bundle",
+  "type": "object",
+  "required": ["security_profiles", "policy_versions"],
+  "properties": {
+    "metadata": {
+      "type": "object"
+    },
+    "security_profiles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["algorithm", "overhead_s", "per_byte_s", "header_bytes", "tag_bytes"],
+        "properties": {
+          "algorithm": { "type": "string" },
+          "overhead_s": { "type": "number" },
+          "per_byte_s": { "type": "number" },
+          "verify_overhead_s": { "type": "number" },
+          "rekey_overhead_s": { "type": "number" },
+          "header_bytes": { "type": "integer" },
+          "tag_bytes": { "type": "integer" },
+          "aux_bytes": { "type": "integer" },
+          "anti_replay": { "type": "boolean" },
+          "ack_required": { "type": "boolean" },
+          "batching_allowed": { "type": "boolean" },
+          "drop_before_encrypt": { "type": "boolean" },
+          "rekey_every_n_messages": { "type": ["integer", "null"] }
+        }
+      }
+    },
+    "policy_versions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["version_id", "class_policies"],
+        "properties": {
+          "version_id": { "type": "string" },
+          "description": { "type": "string" },
+          "class_policies": {
+            "type": "object",
+            "properties": {
+              "critical": { "$ref": "#/$defs/classPolicy" },
+              "control": { "$ref": "#/$defs/classPolicy" },
+              "telemetry": { "$ref": "#/$defs/classPolicy" },
+              "background": { "$ref": "#/$defs/classPolicy" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "classPolicy": {
+      "type": "object",
+      "required": [
+        "priority",
+        "weight",
+        "max_retransmissions",
+        "aggregation_enabled",
+        "drop_allowed",
+        "deadline_s",
+        "security_profile"
+      ],
+      "properties": {
+        "priority": { "type": "integer" },
+        "weight": { "type": "integer" },
+        "max_retransmissions": { "type": "integer" },
+        "aggregation_enabled": { "type": "boolean" },
+        "drop_allowed": { "type": "boolean" },
+        "deadline_s": { "type": "number" },
+        "security_profile": { "type": "string" },
+        "authorized_sources": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

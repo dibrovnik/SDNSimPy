@@ -1,0 +1,81 @@
+{
+  "run_id": "scenario_c_overload",
+  "scenario": "C-overload",
+  "seed": 104,
+  "duration_s": 15.0,
+  "queue_discipline": "drr",
+  "classification_delay_s": 0.0001,
+  "crypto_workers": 1,
+  "grace_period_s": 4.0,
+  "channel": {
+    "bandwidth_bps": 64000,
+    "propagation_delay_s": 0.02,
+    "loss_probability": 0.05,
+    "buffer_size": 10
+  },
+  "ack": {
+    "delay_s": 0.01,
+    "loss_probability": 0.03
+  },
+  "aggregation": {
+    "max_messages": 6,
+    "max_payload_bytes": 3072,
+    "hold_time_s": 0.0,
+    "member_overhead_bytes": 12
+  },
+  "crypto_engine": {
+    "mode": "synthetic"
+  },
+  "policy_backend": {
+    "backend_type": "file",
+    "path": "../policies/baseline_policies.json"
+  },
+  "initial_policy_version": "scenario_c_priority_protected",
+  "policy_updates": [
+    {
+      "at_time_s": 6.0,
+      "version_id": "scenario_c_emergency"
+    }
+  ],
+  "replay_window_size": 64,
+  "sources": [
+    {
+      "source_id": "source_critical",
+      "message_class": "critical",
+      "generator": "burst",
+      "payload_bytes": 64,
+      "dst": "receiver",
+      "deadline_s": 0.12,
+      "burst_size": 3,
+      "burst_interval_s": 3.0,
+      "intra_burst_gap_s": 0.02
+    },
+    {
+      "source_id": "source_command",
+      "message_class": "control",
+      "generator": "periodic",
+      "payload_bytes": 128,
+      "dst": "receiver",
+      "deadline_s": 0.45,
+      "interval_s": 0.5
+    },
+    {
+      "source_id": "source_telemetry",
+      "message_class": "telemetry",
+      "generator": "poisson",
+      "payload_bytes": 512,
+      "dst": "receiver",
+      "deadline_s": 1.5,
+      "rate_per_sec": 8.0
+    },
+    {
+      "source_id": "source_background",
+      "message_class": "background",
+      "generator": "poisson",
+      "payload_bytes": 1024,
+      "dst": "receiver",
+      "deadline_s": 6.0,
+      "rate_per_sec": 3.0
+    }
+  ]
+}

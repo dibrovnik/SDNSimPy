@@ -1,0 +1,269 @@
+{
+  "metadata": {
+    "name": "baseline_policy_bundle",
+    "description": "Policy versions for scenarios A, B and C of secure delivery experiments"
+  },
+  "security_profiles": {
+    "uniform_secure": {
+      "algorithm": "AES-GCM",
+      "overhead_s": 0.0018,
+      "per_byte_s": 0.000004,
+      "verify_overhead_s": 0.00035,
+      "rekey_overhead_s": 0.0008,
+      "header_bytes": 24,
+      "tag_bytes": 16,
+      "aux_bytes": 8,
+      "anti_replay": true,
+      "ack_required": true,
+      "batching_allowed": false,
+      "drop_before_encrypt": false,
+      "rekey_every_n_messages": 128
+    },
+    "aead_fast_ack": {
+      "algorithm": "ChaCha20-Poly1305",
+      "overhead_s": 0.001,
+      "per_byte_s": 0.000003,
+      "verify_overhead_s": 0.00025,
+      "rekey_overhead_s": 0.0005,
+      "header_bytes": 20,
+      "tag_bytes": 16,
+      "aux_bytes": 8,
+      "anti_replay": true,
+      "ack_required": true,
+      "batching_allowed": false,
+      "drop_before_encrypt": false,
+      "rekey_every_n_messages": 96
+    },
+    "aead_control": {
+      "algorithm": "AES-GCM",
+      "overhead_s": 0.0015,
+      "per_byte_s": 0.0000035,
+      "verify_overhead_s": 0.0003,
+      "rekey_overhead_s": 0.0006,
+      "header_bytes": 24,
+      "tag_bytes": 16,
+      "aux_bytes": 8,
+      "anti_replay": true,
+      "ack_required": true,
+      "batching_allowed": false,
+      "drop_before_encrypt": false,
+      "rekey_every_n_messages": 128
+    },
+    "telemetry_light": {
+      "algorithm": "Ascon-128a",
+      "overhead_s": 0.0005,
+      "per_byte_s": 0.0000018,
+      "verify_overhead_s": 0.0001,
+      "rekey_overhead_s": 0.00025,
+      "header_bytes": 12,
+      "tag_bytes": 8,
+      "aux_bytes": 4,
+      "anti_replay": false,
+      "ack_required": false,
+      "batching_allowed": true,
+      "drop_before_encrypt": false,
+      "rekey_every_n_messages": 256
+    },
+    "background_min": {
+      "algorithm": "Ascon-128",
+      "overhead_s": 0.00015,
+      "per_byte_s": 0.000001,
+      "verify_overhead_s": 0.00005,
+      "rekey_overhead_s": 0.00015,
+      "header_bytes": 8,
+      "tag_bytes": 8,
+      "aux_bytes": 4,
+      "anti_replay": false,
+      "ack_required": false,
+      "batching_allowed": true,
+      "drop_before_encrypt": true,
+      "rekey_every_n_messages": 512
+    }
+  },
+  "policy_versions": [
+    {
+      "version_id": "scenario_a_uniform_fifo",
+      "description": "Scenario A: FIFO queue with a uniform security profile for all messages",
+      "class_policies": {
+        "critical": {
+          "priority": 10,
+          "weight": 1,
+          "max_retransmissions": 1,
+          "aggregation_enabled": false,
+          "drop_allowed": false,
+          "deadline_s": 0.15,
+          "security_profile": "uniform_secure",
+          "authorized_sources": ["source_critical", "source_command"]
+        },
+        "control": {
+          "priority": 10,
+          "weight": 1,
+          "max_retransmissions": 1,
+          "aggregation_enabled": false,
+          "drop_allowed": false,
+          "deadline_s": 0.5,
+          "security_profile": "uniform_secure",
+          "authorized_sources": ["source_command"]
+        },
+        "telemetry": {
+          "priority": 10,
+          "weight": 1,
+          "max_retransmissions": 0,
+          "aggregation_enabled": false,
+          "drop_allowed": false,
+          "deadline_s": 1.2,
+          "security_profile": "uniform_secure",
+          "authorized_sources": ["source_telemetry"]
+        },
+        "background": {
+          "priority": 10,
+          "weight": 1,
+          "max_retransmissions": 0,
+          "aggregation_enabled": false,
+          "drop_allowed": true,
+          "deadline_s": 4.0,
+          "security_profile": "uniform_secure",
+          "authorized_sources": ["source_background"]
+        }
+      }
+    },
+    {
+      "version_id": "scenario_b_priority_uniform",
+      "description": "Scenario B: strict priority scheduling with a uniform security profile",
+      "class_policies": {
+        "critical": {
+          "priority": 1,
+          "weight": 4,
+          "max_retransmissions": 1,
+          "aggregation_enabled": false,
+          "drop_allowed": false,
+          "deadline_s": 0.15,
+          "security_profile": "uniform_secure",
+          "authorized_sources": ["source_critical", "source_command"]
+        },
+        "control": {
+          "priority": 2,
+          "weight": 3,
+          "max_retransmissions": 1,
+          "aggregation_enabled": false,
+          "drop_allowed": false,
+          "deadline_s": 0.5,
+          "security_profile": "uniform_secure",
+          "authorized_sources": ["source_command"]
+        },
+        "telemetry": {
+          "priority": 3,
+          "weight": 2,
+          "max_retransmissions": 0,
+          "aggregation_enabled": false,
+          "drop_allowed": false,
+          "deadline_s": 1.2,
+          "security_profile": "uniform_secure",
+          "authorized_sources": ["source_telemetry"]
+        },
+        "background": {
+          "priority": 4,
+          "weight": 1,
+          "max_retransmissions": 0,
+          "aggregation_enabled": false,
+          "drop_allowed": true,
+          "deadline_s": 4.0,
+          "security_profile": "uniform_secure",
+          "authorized_sources": ["source_background"]
+        }
+      }
+    },
+    {
+      "version_id": "scenario_c_priority_protected",
+      "description": "Scenario C: differentiated protection profiles and weighted scheduling",
+      "class_policies": {
+        "critical": {
+          "priority": 1,
+          "weight": 8,
+          "max_retransmissions": 2,
+          "aggregation_enabled": false,
+          "drop_allowed": false,
+          "deadline_s": 0.12,
+          "security_profile": "aead_fast_ack",
+          "authorized_sources": ["source_critical", "source_command"]
+        },
+        "control": {
+          "priority": 2,
+          "weight": 4,
+          "max_retransmissions": 1,
+          "aggregation_enabled": false,
+          "drop_allowed": false,
+          "deadline_s": 0.45,
+          "security_profile": "aead_control",
+          "authorized_sources": ["source_command"]
+        },
+        "telemetry": {
+          "priority": 3,
+          "weight": 2,
+          "max_retransmissions": 0,
+          "aggregation_enabled": true,
+          "drop_allowed": false,
+          "deadline_s": 1.5,
+          "security_profile": "telemetry_light",
+          "authorized_sources": ["source_telemetry"]
+        },
+        "background": {
+          "priority": 4,
+          "weight": 1,
+          "max_retransmissions": 0,
+          "aggregation_enabled": false,
+          "drop_allowed": true,
+          "deadline_s": 6.0,
+          "security_profile": "background_min",
+          "authorized_sources": ["source_background"]
+        }
+      }
+    },
+    {
+      "version_id": "scenario_c_emergency",
+      "description": "Emergency policy version with stronger critical preference under overload",
+      "class_policies": {
+        "critical": {
+          "priority": 1,
+          "weight": 10,
+          "max_retransmissions": 3,
+          "aggregation_enabled": false,
+          "drop_allowed": false,
+          "deadline_s": 0.1,
+          "security_profile": "aead_fast_ack",
+          "authorized_sources": ["source_critical", "source_command"]
+        },
+        "control": {
+          "priority": 2,
+          "weight": 5,
+          "max_retransmissions": 2,
+          "aggregation_enabled": false,
+          "drop_allowed": false,
+          "deadline_s": 0.4,
+          "security_profile": "aead_control",
+          "authorized_sources": ["source_command"]
+        },
+        "telemetry": {
+          "priority": 3,
+          "weight": 1,
+          "max_retransmissions": 0,
+          "aggregation_enabled": true,
+          "drop_allowed": false,
+          "deadline_s": 1.8,
+          "security_profile": "telemetry_light",
+          "authorized_sources": ["source_telemetry"]
+        },
+        "background": {
+          "priority": 4,
+          "weight": 1,
+          "max_retransmissions": 0,
+          "aggregation_enabled": false,
+          "drop_allowed": true,
+          "deadline_s": 6.0,
+          "security_profile": "background_min",
+          "authorized_sources": ["source_background"]
+        }
+      }
+    }
+  ]
+}

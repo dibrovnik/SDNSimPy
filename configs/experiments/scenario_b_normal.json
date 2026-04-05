@@ -1,0 +1,74 @@
+{
+  "run_id": "scenario_b_normal",
+  "scenario": "B",
+  "seed": 102,
+  "duration_s": 15.0,
+  "queue_discipline": "strict_priority",
+  "classification_delay_s": 0.0001,
+  "crypto_workers": 1,
+  "grace_period_s": 3.0,
+  "channel": {
+    "bandwidth_bps": 64000,
+    "propagation_delay_s": 0.02,
+    "loss_probability": 0.01,
+    "buffer_size": 50
+  },
+  "ack": {
+    "delay_s": 0.01,
+    "loss_probability": 0.0
+  },
+  "aggregation": {
+    "max_messages": 4,
+    "max_payload_bytes": 2048,
+    "hold_time_s": 0.0,
+    "member_overhead_bytes": 12
+  },
+  "crypto_engine": {
+    "mode": "synthetic"
+  },
+  "policy_backend": {
+    "backend_type": "file",
+    "path": "../policies/baseline_policies.json"
+  },
+  "initial_policy_version": "scenario_b_priority_uniform",
+  "policy_updates": [],
+  "replay_window_size": 64,
+  "sources": [
+    {
+      "source_id": "source_critical",
+      "message_class": "critical",
+      "generator": "periodic",
+      "payload_bytes": 64,
+      "dst": "receiver",
+      "deadline_s": 0.15,
+      "interval_s": 1.5
+    },
+    {
+      "source_id": "source_command",
+      "message_class": "control",
+      "generator": "periodic",
+      "payload_bytes": 128,
+      "dst": "receiver",
+      "deadline_s": 0.5,
+      "interval_s": 0.75
+    },
+    {
+      "source_id": "source_telemetry",
+      "message_class": "telemetry",
+      "generator": "poisson",
+      "payload_bytes": 512,
+      "dst": "receiver",
+      "deadline_s": 1.2,
+      "rate_per_sec": 4.0
+    },
+    {
+      "source_id": "source_background",
+      "message_class": "background",
+      "generator": "poisson",
+      "payload_bytes": 1024,
+      "dst": "receiver",
+      "deadline_s": 4.0,
+      "rate_per_sec": 1.0
+    }
+  ]
+}
