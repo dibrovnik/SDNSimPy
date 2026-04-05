@@ -37,60 +37,59 @@ Execution examples:
     
     https://youtu.be/bnh35npcA-A
 
-## Headless secure-delivery mode
+## Headless secure-delivery mode (Article Experiments Workflow)
 
-The repository now also contains a separate research layer for secure prioritized inter-agent delivery experiments.
-This layer is isolated from the legacy GUI simulator and is intended for reproducible CLI runs.
+The repository contains a separate research layer for secure prioritized inter-agent delivery experiments.
+This layer is isolated from the legacy GUI simulator and is intended for reproducible CLI runs for the article.
 
-### Local virtual environment
+### 0. Local virtual environment & setup
 
 Create a project-local virtual environment and install the headless dependencies:
 
     python3 -m venv .venv
     .venv/bin/pip install -r requirements-headless.txt
 
-### Run one experiment
+### 1. Run full batch (Baseline)
 
-    .venv/bin/python -m secure_delivery.cli run-experiment --config configs/experiments/scenario_c_normal.json --output-dir /tmp/secure-delivery-scenario-c-normal
+Run the initial grid to test the environment (optional but recommended):
 
-### Run a batch of experiments
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m secure_delivery.cli run-batch --config-dir configs/experiments --output-root /tmp/secure-delivery-batch
 
-    .venv/bin/python -m secure_delivery.cli run-batch --config-dir configs/experiments --output-root /tmp/secure-delivery-batch
+### 2. Run the 30-seed series for the article (Statistical Significance)
 
-### Run a seed series for article experiments
+Perform the main set of experiments with 30 replicates to ensure statistical validity:
 
-    .venv/bin/python -m secure_delivery.cli run-batch --config-dir configs/experiments --output-root /tmp/secure-delivery-batch-30x --replicates 30 --seed-step 1
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m secure_delivery.cli run-batch --config-dir configs/experiments --output-root /tmp/secure-delivery-batch-30x --replicates 30 --seed-step 1
 
-### Run an expanded parameter sweep
+### 3. Run expanded parameter sweep (Matrix Sweep)
 
-    .venv/bin/python -m secure_delivery.cli run-sweep --base-config-dir configs/experiments --matrix configs/sweeps/article_extended_grid.json --output-root /tmp/secure-delivery-expanded-sweep --replicates 5 --seed-step 1
+Run the extended grid of parameters for deeper analysis:
 
-### Compare one metric across A/B/C
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m secure_delivery.cli run-sweep --base-config-dir configs/experiments --matrix configs/sweeps/article_extended_grid.json --output-root /tmp/secure-delivery-expanded-sweep --replicates 1 --seed-step 1
 
-    .venv/bin/python -m secure_delivery.cli compare-metric --input-root /tmp/secure-delivery-batch --metric critical_deadline_met_ratio
+### 4. Export article tables
 
-`compare-metric` now also exports `stddev`, `stderr` and `95% CI` for seed-series runs.
+Extract the aggregated and calculated results (including stddev, stderr, 95% CI) directly into CSVs for the article:
 
-### Export article tables
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m secure_delivery.cli export-article --input-root /tmp/secure-delivery-batch-30x --output-dir /tmp/secure-delivery-article-tables
 
-    .venv/bin/python -m secure_delivery.cli export-article --input-root /tmp/secure-delivery-batch --output-dir /tmp/secure-delivery-article-tables
+### 5. Build plots
 
-The export includes:
+Generate visualizations in a headless environment:
 
-- `table_critical_performance.csv`
-- `table_system_cost.csv`
-- `table_critical_components.csv`
-- `table_scenario_deltas.csv`
+    PYTHONDONTWRITEBYTECODE=1 MPLCONFIGDIR=/tmp XDG_CACHE_HOME=/tmp .venv/bin/python -m secure_delivery.cli build-plots --input-dir /tmp/secure-delivery-batch-30x --output-dir /tmp/secure-delivery-batch-30x-plots
 
-### Build plots from exported CSV
+### 6. Run validations and unit tests
 
-For headless environments it is recommended to set temporary cache directories for matplotlib:
+To verify the integrity of the models, policies, and cryptographic components before or after the experiments:
 
-    MPLCONFIGDIR=/tmp XDG_CACHE_HOME=/tmp .venv/bin/python -m secure_delivery.cli build-plots --input-dir /tmp/secure-delivery-scenario-c-normal --output-dir /tmp/secure-delivery-scenario-c-normal-plots
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest tests.test_sweep tests.test_scheduler tests.test_analysis tests.test_runner tests.test_behaviors tests.test_policy tests.test_crypto tests.test_replay
 
-Helper scripts:
+### Helper Scripts (Alternative to CLI)
+
+You can also use the preset bash scripts in the `scripts/` directory:
 
     scripts/run_headless_batch.sh /tmp/secure-delivery-batch
     scripts/run_article_study_30x.sh /tmp/secure-delivery-batch-30x
     scripts/run_expanded_sweep.sh /tmp/secure-delivery-expanded-sweep configs/sweeps/article_extended_grid.json 5
-    scripts/export_article_assets.sh /tmp/secure-delivery-batch /tmp/secure-delivery-article-tables /tmp/secure-delivery-batch-plots
+    scripts/export_article_assets.sh /tmp/secure-delivery-batch-30x /tmp/secure-delivery-article-tables /tmp/secure-delivery-batch-plots
