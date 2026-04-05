@@ -85,7 +85,7 @@ class GatewayScheduler:
             self._drop_message(message, "drop_before_encrypt", "ingress")
             return
 
-        with self.crypto_resource.request(priority=class_policy.priority) as request:
+        with self.crypto_resource.request(priority=self._crypto_priority(class_policy)) as request:
             yield request
             crypto_start = self.env.now
             if message.crypto_start_at is None:
@@ -121,6 +121,14 @@ class GatewayScheduler:
     def _notify_dispatcher(self) -> None:
         if not self.queue_signal.triggered:
             self.queue_signal.succeed()
+
+    def _crypto_priority(self, class_policy: ClassPolicy) -> int:
+        mode = self.config.crypto_engine.priority_mode.lower()
+        if mode == "uniform":
+            return 0
+        if mode == "class":
+            return class_policy.priority
+        raise ValueError(f"Unsupported crypto priority mode: {self.config.crypto_engine.priority_mode}")
 
     def _dispatch_loop(self):
         while True:
@@ -253,53 +261,11 @@ class GatewayScheduler:
         selected_class = self._select_message_class()
         if selected_class is None:
             return None
-        store = self.class_queues[selected_class]
-        if not store.items:
+        batch = self._build_transmission_batch(selected_class, consume=True)
+        if batch is None:
             return None
-
-        first_message = store.items.pop(0)
-        class_policy, profile = self.policy_manager.resolve_message_policy(first_message)
-        messages = [first_message]
-        total_payload = first_message.payload_bytes
-
-        if (
-            selected_class == MessageClass.TELEMETRY
-            and class_policy.aggregation_enabled
-            and profile.batching_allowed
-            and self.config.aggregation.max_messages > 1
-        ):
-            while (
-                len(messages) < self.config.aggregation.max_messages
-                and store.items
-                and (
-                    self.config.aggregation.max_payload_bytes <= 0
-                    or total_payload + store.items[0].payload_bytes <= self.config.aggregation.max_payload_bytes
-                )
-            ):
-                next_message = store.items.pop(0)
-                messages.append(next_message)
-                total_payload += next_message.payload_bytes
-
         self._record_queue_lengths()
-
-        members = len(messages)
-        full_size_bytes = self.crypto_engine.compute_full_size(
-            profile=profile,
-            payload_bytes=total_payload + self.config.aggregation.member_overhead_bytes * max(0, members - 1),
-            members=members,
-        )
-        tx_time_s = (8.0 * full_size_bytes) / self.config.channel.bandwidth_bps + self.config.channel.propagation_delay_s
-        for message in messages:
-            message.metadata["aggregation_size"] = members
-            message.metadata["effective_tx_bytes"] = full_size_bytes / float(members)
-        return TransmissionBatch(
-            messages=messages,
-            message_class=selected_class,
-            class_policy=class_policy,
-            profile=profile,
-            full_size_bytes=full_size_bytes,
-            tx_time_s=tx_time_s,
-        )
+        return batch
 
     def _select_message_class(self) -> Optional[MessageClass]:
         non_empty_classes = [message_class for message_class in MESSAGE_CLASS_ORDER if self.class_queues[message_class].items]
@@ -332,8 +298,7 @@ class GatewayScheduler:
 
             class_policy = self.policy_manager.get_class_policy(message_class)
             self.drr_deficits[message_class] += class_policy.weight * self.drr_base_quantum_bytes
-            head_message = store.items[0]
-            message_size = head_message.full_size_bytes or head_message.payload_bytes
+            message_size = self._estimate_batch_service_bytes(message_class)
             if message_size <= self.drr_deficits[message_class]:
                 self.drr_deficits[message_class] -= message_size
                 return message_class
@@ -348,3 +313,102 @@ class GatewayScheduler:
         for replay_window in self.replay_windows.values():
             events.extend(replay_window.export_events())
         return events
+
+    def _estimate_batch_service_bytes(self, message_class: MessageClass) -> int:
+        batch = self._build_transmission_batch(message_class, consume=False)
+        if batch is None:
+            return 0
+        return batch.full_size_bytes
+
+    def _build_transmission_batch(
+        self,
+        message_class: MessageClass,
+        consume: bool,
+    ) -> Optional[TransmissionBatch]:
+        store = self.class_queues[message_class]
+        if not store.items:
+            return None
+
+        class_policy = self.policy_manager.get_class_policy(message_class)
+        profile = self.policy_manager.security_profiles[class_policy.security_profile]
+        higher_priority_backlog = self._has_higher_priority_backlog(message_class)
+
+        if consume:
+            first_message = store.items.pop(0)
+            candidate_items = store.items
+        else:
+            first_message = store.items[0]
+            candidate_items = store.items[1:]
+
+        messages = [first_message]
+        total_payload = first_message.payload_bytes
+        candidate_index = 0
+
+        if self._can_aggregate(message_class, class_policy, profile, higher_priority_backlog):
+            while len(messages) < self.config.aggregation.max_messages and candidate_index < len(candidate_items):
+                next_message = candidate_items[candidate_index]
+                proposed_payload = total_payload + next_message.payload_bytes
+                if (
+                    self.config.aggregation.max_payload_bytes > 0
+                    and proposed_payload > self.config.aggregation.max_payload_bytes
+                ):
+                    break
+                if consume:
+                    messages.append(store.items.pop(0))
+                else:
+                    messages.append(next_message)
+                    candidate_index += 1
+                total_payload = proposed_payload
+
+        full_size_bytes = self._compute_batch_full_size(profile, total_payload, len(messages))
+        tx_time_s = self._compute_tx_time(full_size_bytes)
+        if consume:
+            for message in messages:
+                message.metadata["aggregation_size"] = len(messages)
+                message.metadata["effective_tx_bytes"] = full_size_bytes / float(len(messages))
+                if higher_priority_backlog and message_class == MessageClass.TELEMETRY:
+                    message.metadata["aggregation_suppressed"] = True
+        return TransmissionBatch(
+            messages=messages,
+            message_class=message_class,
+            class_policy=class_policy,
+            profile=profile,
+            full_size_bytes=full_size_bytes,
+            tx_time_s=tx_time_s,
+        )
+
+    def _can_aggregate(
+        self,
+        message_class: MessageClass,
+        class_policy: ClassPolicy,
+        profile: SecurityProfile,
+        higher_priority_backlog: bool,
+    ) -> bool:
+        return (
+            message_class == MessageClass.TELEMETRY
+            and class_policy.aggregation_enabled
+            and profile.batching_allowed
+            and self.config.aggregation.max_messages > 1
+            and not higher_priority_backlog
+        )
+
+    def _has_higher_priority_backlog(self, message_class: MessageClass) -> bool:
+        current_priority = self.policy_manager.get_class_policy(message_class).priority
+        for other_class in MESSAGE_CLASS_ORDER:
+            if other_class == message_class:
+                continue
+            if not self.class_queues[other_class].items:
+                continue
+            if self.policy_manager.get_class_policy(other_class).priority < current_priority:
+                return True
+        return False
+
+    def _compute_batch_full_size(self, profile: SecurityProfile, total_payload: int, members: int) -> int:
+        return self.crypto_engine.compute_full_size(
+            profile=profile,
+            payload_bytes=total_payload + self.config.aggregation.member_overhead_bytes * max(0, members - 1),
+            members=members,
+        )
+
+    def _compute_tx_time(self, full_size_bytes: int) -> float:
+        return (8.0 * full_size_bytes) / self.config.channel.bandwidth_bps + self.config.channel.propagation_delay_s

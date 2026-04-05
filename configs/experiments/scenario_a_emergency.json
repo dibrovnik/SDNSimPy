@@ -1,42 +1,42 @@
 {
-  "run_id": "scenario_c_overload",
-  "scenario": "C",
-  "scenario_family": "C",
-  "load_profile": "overload",
-  "seed": 104,
+  "run_id": "scenario_a_emergency",
+  "scenario": "A",
+  "scenario_family": "A",
+  "load_profile": "emergency",
+  "seed": 131,
   "duration_s": 15.0,
-  "queue_discipline": "drr",
+  "queue_discipline": "fifo",
   "classification_delay_s": 0.0001,
   "crypto_workers": 1,
   "grace_period_s": 4.0,
   "channel": {
     "bandwidth_bps": 64000,
     "propagation_delay_s": 0.02,
-    "loss_probability": 0.05,
-    "buffer_size": 10
+    "loss_probability": 0.02,
+    "buffer_size": 30
   },
   "ack": {
     "delay_s": 0.01,
-    "loss_probability": 0.03
+    "loss_probability": 0.01
   },
   "aggregation": {
-    "max_messages": 3,
-    "max_payload_bytes": 1536,
+    "max_messages": 5,
+    "max_payload_bytes": 2560,
     "hold_time_s": 0.0,
     "member_overhead_bytes": 12
   },
   "crypto_engine": {
     "mode": "synthetic",
-    "priority_mode": "class"
+    "priority_mode": "uniform"
   },
   "policy_backend": {
     "backend_type": "file",
     "path": "../policies/baseline_policies.json"
   },
-  "initial_policy_version": "scenario_c_emergency",
+  "initial_policy_version": "scenario_a_uniform_fifo",
   "policy_updates": [],
   "replay_window_size": 64,
-  "notes": "Scenario C under overload starts in the emergency policy and constrains telemetry aggregation to reduce critical blocking.",
+  "notes": "Scenario A with emergency critical bursts.",
   "sources": [
     {
       "source_id": "source_critical",
@@ -44,10 +44,10 @@
       "generator": "burst",
       "payload_bytes": 64,
       "dst": "receiver",
-      "deadline_s": 0.12,
-      "burst_size": 3,
-      "burst_interval_s": 3.0,
-      "intra_burst_gap_s": 0.02
+      "deadline_s": 0.15,
+      "burst_size": 4,
+      "burst_interval_s": 2.5,
+      "intra_burst_gap_s": 0.015
     },
     {
       "source_id": "source_command",
@@ -55,8 +55,8 @@
       "generator": "periodic",
       "payload_bytes": 128,
       "dst": "receiver",
-      "deadline_s": 0.45,
-      "interval_s": 0.5
+      "deadline_s": 0.5,
+      "interval_s": 0.45
     },
     {
       "source_id": "source_telemetry",
@@ -64,8 +64,8 @@
       "generator": "poisson",
       "payload_bytes": 512,
       "dst": "receiver",
-      "deadline_s": 1.5,
-      "rate_per_sec": 8.0
+      "deadline_s": 1.2,
+      "rate_per_sec": 5.0
     },
     {
       "source_id": "source_background",
@@ -73,8 +73,8 @@
       "generator": "poisson",
       "payload_bytes": 1024,
       "dst": "receiver",
-      "deadline_s": 6.0,
-      "rate_per_sec": 3.0
+      "deadline_s": 4.0,
+      "rate_per_sec": 1.0
     }
   ]
 }

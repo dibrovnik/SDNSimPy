@@ -35,6 +35,7 @@ class CryptoEngineConfig:
     mode: str = "synthetic"
     lookup_tables: Dict[str, Dict[str, float]] = field(default_factory=dict)
     measured_stub_scale: float = 1.0
+    priority_mode: str = "class"
 
 
 @dataclass
@@ -88,6 +89,8 @@ class SourceConfig:
 class ExperimentConfig:
     run_id: str
     scenario: str
+    scenario_family: str
+    load_profile: str
     seed: int
     duration_s: float
     queue_discipline: QueueDiscipline
@@ -103,6 +106,7 @@ class ExperimentConfig:
     policy_updates: List[PolicyUpdateConfig]
     replay_window_size: int
     sources: List[SourceConfig]
+    notes: str = ""
 
     @classmethod
     def from_dict(cls, payload: Dict[str, object], config_path: Optional[Path] = None) -> "ExperimentConfig":
@@ -114,6 +118,8 @@ class ExperimentConfig:
         return cls(
             run_id=str(payload["run_id"]),
             scenario=str(payload["scenario"]),
+            scenario_family=str(payload.get("scenario_family", payload["scenario"])),
+            load_profile=str(payload.get("load_profile", "custom")),
             seed=int(payload.get("seed", 1)),
             duration_s=float(payload["duration_s"]),
             queue_discipline=QueueDiscipline.from_value(str(payload["queue_discipline"])),
@@ -135,6 +141,7 @@ class ExperimentConfig:
             ],
             replay_window_size=int(payload.get("replay_window_size", 64)),
             sources=[SourceConfig.from_dict(item) for item in payload.get("sources", [])],
+            notes=str(payload.get("notes", "")),
         )
 
 

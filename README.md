@@ -57,8 +57,40 @@ Create a project-local virtual environment and install the headless dependencies
 
     .venv/bin/python -m secure_delivery.cli run-batch --config-dir configs/experiments --output-root /tmp/secure-delivery-batch
 
+### Run a seed series for article experiments
+
+    .venv/bin/python -m secure_delivery.cli run-batch --config-dir configs/experiments --output-root /tmp/secure-delivery-batch-30x --replicates 30 --seed-step 1
+
+### Run an expanded parameter sweep
+
+    .venv/bin/python -m secure_delivery.cli run-sweep --base-config-dir configs/experiments --matrix configs/sweeps/article_extended_grid.json --output-root /tmp/secure-delivery-expanded-sweep --replicates 5 --seed-step 1
+
+### Compare one metric across A/B/C
+
+    .venv/bin/python -m secure_delivery.cli compare-metric --input-root /tmp/secure-delivery-batch --metric critical_deadline_met_ratio
+
+`compare-metric` now also exports `stddev`, `stderr` and `95% CI` for seed-series runs.
+
+### Export article tables
+
+    .venv/bin/python -m secure_delivery.cli export-article --input-root /tmp/secure-delivery-batch --output-dir /tmp/secure-delivery-article-tables
+
+The export includes:
+
+- `table_critical_performance.csv`
+- `table_system_cost.csv`
+- `table_critical_components.csv`
+- `table_scenario_deltas.csv`
+
 ### Build plots from exported CSV
 
 For headless environments it is recommended to set temporary cache directories for matplotlib:
 
     MPLCONFIGDIR=/tmp XDG_CACHE_HOME=/tmp .venv/bin/python -m secure_delivery.cli build-plots --input-dir /tmp/secure-delivery-scenario-c-normal --output-dir /tmp/secure-delivery-scenario-c-normal-plots
+
+Helper scripts:
+
+    scripts/run_headless_batch.sh /tmp/secure-delivery-batch
+    scripts/run_article_study_30x.sh /tmp/secure-delivery-batch-30x
+    scripts/run_expanded_sweep.sh /tmp/secure-delivery-expanded-sweep configs/sweeps/article_extended_grid.json 5
+    scripts/export_article_assets.sh /tmp/secure-delivery-batch /tmp/secure-delivery-article-tables /tmp/secure-delivery-batch-plots

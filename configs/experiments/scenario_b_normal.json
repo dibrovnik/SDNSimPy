@@ -1,6 +1,8 @@
 {
   "run_id": "scenario_b_normal",
   "scenario": "B",
+  "scenario_family": "B",
+  "load_profile": "normal",
   "seed": 102,
   "duration_s": 15.0,
   "queue_discipline": "strict_priority",
@@ -24,7 +26,8 @@
     "member_overhead_bytes": 12
   },
   "crypto_engine": {
-    "mode": "synthetic"
+    "mode": "synthetic",
+    "priority_mode": "uniform"
   },
   "policy_backend": {
     "backend_type": "file",
@@ -33,6 +36,7 @@
   "initial_policy_version": "scenario_b_priority_uniform",
   "policy_updates": [],
   "replay_window_size": 64,
+  "notes": "Scenario B baseline: strict priority queue with uniform protection under normal load.",
   "sources": [
     {
       "source_id": "source_critical",

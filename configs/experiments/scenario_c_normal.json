@@ -1,6 +1,8 @@
 {
   "run_id": "scenario_c_normal",
   "scenario": "C",
+  "scenario_family": "C",
+  "load_profile": "normal",
   "seed": 103,
   "duration_s": 15.0,
   "queue_discipline": "drr",
@@ -24,7 +26,8 @@
     "member_overhead_bytes": 12
   },
   "crypto_engine": {
-    "mode": "synthetic"
+    "mode": "synthetic",
+    "priority_mode": "class"
   },
   "policy_backend": {
     "backend_type": "file",
@@ -33,6 +36,7 @@
   "initial_policy_version": "scenario_c_priority_protected",
   "policy_updates": [],
   "replay_window_size": 64,
+  "notes": "Scenario C differentiated protection under normal load.",
   "sources": [
     {
       "source_id": "source_critical",

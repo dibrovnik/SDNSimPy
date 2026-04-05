@@ -1,0 +1,11 @@
+{
+  "dimensions": {
+    "bandwidth_bps": [64000, 128000, 256000],
+    "buffer_size": [10, 50, 100],
+    "loss_probability": [0.0, 0.01, 0.05]
+  },
+  "filters": {
+    "scenario_families": ["A", "B", "C"],
+    "load_profiles": ["normal", "high", "overload", "emergency"]
+  }
+}

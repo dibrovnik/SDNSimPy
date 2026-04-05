@@ -1,11 +1,11 @@
 {
-  "run_id": "scenario_c_overload",
-  "scenario": "C",
-  "scenario_family": "C",
+  "run_id": "scenario_b_overload",
+  "scenario": "B",
+  "scenario_family": "B",
   "load_profile": "overload",
-  "seed": 104,
+  "seed": 122,
   "duration_s": 15.0,
-  "queue_discipline": "drr",
+  "queue_discipline": "strict_priority",
   "classification_delay_s": 0.0001,
   "crypto_workers": 1,
   "grace_period_s": 4.0,
@@ -20,23 +20,23 @@
     "loss_probability": 0.03
   },
   "aggregation": {
-    "max_messages": 3,
-    "max_payload_bytes": 1536,
+    "max_messages": 6,
+    "max_payload_bytes": 3072,
     "hold_time_s": 0.0,
     "member_overhead_bytes": 12
   },
   "crypto_engine": {
     "mode": "synthetic",
-    "priority_mode": "class"
+    "priority_mode": "uniform"
   },
   "policy_backend": {
     "backend_type": "file",
     "path": "../policies/baseline_policies.json"
   },
-  "initial_policy_version": "scenario_c_emergency",
+  "initial_policy_version": "scenario_b_priority_uniform",
   "policy_updates": [],
   "replay_window_size": 64,
-  "notes": "Scenario C under overload starts in the emergency policy and constrains telemetry aggregation to reduce critical blocking.",
+  "notes": "Scenario B under overload.",
   "sources": [
     {
       "source_id": "source_critical",
@@ -44,7 +44,7 @@
       "generator": "burst",
       "payload_bytes": 64,
       "dst": "receiver",
-      "deadline_s": 0.12,
+      "deadline_s": 0.15,
       "burst_size": 3,
       "burst_interval_s": 3.0,
       "intra_burst_gap_s": 0.02
@@ -55,7 +55,7 @@
       "generator": "periodic",
       "payload_bytes": 128,
       "dst": "receiver",
-      "deadline_s": 0.45,
+      "deadline_s": 0.5,
       "interval_s": 0.5
     },
     {
@@ -64,7 +64,7 @@
       "generator": "poisson",
       "payload_bytes": 512,
       "dst": "receiver",
-      "deadline_s": 1.5,
+      "deadline_s": 1.2,
       "rate_per_sec": 8.0
     },
     {
@@ -73,7 +73,7 @@
       "generator": "poisson",
       "payload_bytes": 1024,
       "dst": "receiver",
-      "deadline_s": 6.0,
+      "deadline_s": 4.0,
       "rate_per_sec": 3.0
     }
   ]

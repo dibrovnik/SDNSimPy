@@ -6,10 +6,10 @@
   "security_profiles": {
     "uniform_secure": {
       "algorithm": "AES-GCM",
-      "overhead_s": 0.0018,
-      "per_byte_s": 0.000004,
-      "verify_overhead_s": 0.00035,
-      "rekey_overhead_s": 0.0008,
+      "overhead_s": 0.03,
+      "per_byte_s": 0.00004,
+      "verify_overhead_s": 0.0015,
+      "rekey_overhead_s": 0.004,
       "header_bytes": 24,
       "tag_bytes": 16,
       "aux_bytes": 8,

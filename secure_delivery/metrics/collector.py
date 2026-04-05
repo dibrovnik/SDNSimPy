@@ -27,12 +27,31 @@ def _percentile(values: List[float], percentile: float) -> Optional[float]:
     return values_sorted[lower] + fraction * (values_sorted[upper] - values_sorted[lower])
 
 
+def _jitter(values: List[float]) -> Optional[float]:
+    if len(values) < 2:
+        return 0.0 if values else None
+    diffs = [abs(values[index] - values[index - 1]) for index in range(1, len(values))]
+    return statistics.mean(diffs)
+
+
 class MetricsCollector:
-    def __init__(self, run_id: str, scenario: str, seed: int, duration_s: float) -> None:
+    def __init__(
+        self,
+        run_id: str,
+        scenario: str,
+        scenario_family: str,
+        load_profile: str,
+        seed: int,
+        duration_s: float,
+        config_name: str = "",
+    ) -> None:
         self.run_id = run_id
         self.scenario = scenario
+        self.scenario_family = scenario_family
+        self.load_profile = load_profile
         self.seed = seed
         self.duration_s = duration_s
+        self.config_name = config_name
         self.messages: List[SecureMessage] = []
         self.queue_timeseries: List[Dict[str, object]] = []
         self.resource_usage: List[Dict[str, object]] = []
@@ -98,10 +117,30 @@ class MetricsCollector:
         observation_window_s = max(
             [self.duration_s] + [float(item["end_time_s"]) for item in self.resource_usage]
         ) if self.resource_usage else self.duration_s
+        delivered_ratio = len(delivered) / len(self.messages) if self.messages else 0.0
+        dropped_ratio = sum(1 for message in self.messages if message.dropped) / len(self.messages) if self.messages else 0.0
+        total_retransmissions = sum(message.retransmission_count for message in self.messages)
+        total_latency_values = [float(record["total_latency_s"]) for record in message_records if record["total_latency_s"] is not None]
+        total_crypto_times = [message.component_times["crypto_time_s"] for message in self.messages]
+        average_crypto_share = statistics.mean(
+            [
+                message.component_times["crypto_time_s"] / message.total_latency_s
+                for message in self.messages
+                if message.total_latency_s not in (None, 0.0)
+            ]
+        ) if any(message.total_latency_s not in (None, 0.0) for message in self.messages) else 0.0
+        security_overhead_ratios = [
+            (message.full_size_bytes - message.payload_bytes) / float(message.full_size_bytes)
+            for message in self.messages
+            if message.full_size_bytes
+        ]
 
         summary: Dict[str, object] = {
             "run_id": self.run_id,
             "scenario": self.scenario,
+            "scenario_family": self.scenario_family,
+            "load_profile": self.load_profile,
+            "config_name": self.config_name,
             "seed": self.seed,
             "duration_s": self.duration_s,
             "observation_window_s": observation_window_s,
@@ -109,6 +148,14 @@ class MetricsCollector:
             "messages_delivered": sum(1 for message in self.messages if message.delivered),
             "messages_dropped": sum(1 for message in self.messages if message.dropped),
             "deadline_missed": sum(1 for message in self.messages if message.deadline_missed),
+            "delivered_ratio": delivered_ratio,
+            "dropped_ratio": dropped_ratio,
+            "deadline_missed_ratio": (
+                sum(1 for message in self.messages if message.deadline_missed) / len(self.messages)
+                if self.messages else 0.0
+            ),
+            "retransmissions_total": total_retransmissions,
+            "retransmission_ratio": total_retransmissions / len(self.messages) if self.messages else 0.0,
             "average_queue_length": queue_average,
             "max_queue_length": queue_max,
             "channel_utilization": (
@@ -121,6 +168,17 @@ class MetricsCollector:
 
         delivered_bytes = sum(float(message.metadata.get("effective_tx_bytes", message.full_size_bytes)) for message in delivered)
         summary["throughput_bps"] = (delivered_bytes * 8.0) / self.duration_s if self.duration_s else 0.0
+        summary["latency_mean_s"] = statistics.mean(total_latency_values) if total_latency_values else None
+        summary["latency_median_s"] = statistics.median(total_latency_values) if total_latency_values else None
+        summary["latency_p95_s"] = _percentile(total_latency_values, 0.95)
+        summary["latency_p99_s"] = _percentile(total_latency_values, 0.99)
+        summary["jitter_s"] = _jitter(total_latency_values)
+        summary["crypto_time_mean_s"] = statistics.mean(total_crypto_times) if total_crypto_times else 0.0
+        summary["crypto_time_total_s"] = sum(total_crypto_times)
+        summary["crypto_share_latency_ratio"] = average_crypto_share
+        summary["security_overhead_ratio"] = (
+            statistics.mean(security_overhead_ratios) if security_overhead_ratios else 0.0
+        )
 
         for message_class in MESSAGE_CLASS_ORDER:
             class_name = message_class.value
@@ -128,17 +186,48 @@ class MetricsCollector:
             class_delivered = [message for message in class_messages if message.delivered]
             class_latencies = latency_by_class[class_name]
             deadline_met = sum(1 for message in class_messages if message.delivered and not message.deadline_missed)
+            class_deadline_missed = sum(1 for message in class_messages if message.deadline_missed)
+            class_dropped = sum(1 for message in class_messages if message.dropped)
+            class_retransmissions = sum(message.retransmission_count for message in class_messages)
             delivered_wire_bytes = sum(
                 float(message.metadata.get("effective_tx_bytes", message.full_size_bytes))
                 for message in class_delivered
             )
             delivered_payload_bytes = sum(message.payload_bytes for message in class_delivered)
+            class_crypto_times = [message.component_times["crypto_time_s"] for message in class_messages]
+            class_classification_times = [message.component_times["classification_time_s"] for message in class_messages]
+            class_queue_times = [message.component_times["queue_time_s"] for message in class_messages]
+            class_tx_times = [message.component_times["tx_time_s"] for message in class_messages]
+            class_ack_times = [message.component_times["ack_time_s"] for message in class_messages]
+            class_crypto_share_values = [
+                message.component_times["crypto_time_s"] / message.total_latency_s
+                for message in class_messages
+                if message.total_latency_s not in (None, 0.0)
+            ]
+            class_security_overhead_values = [
+                (message.full_size_bytes - message.payload_bytes) / float(message.full_size_bytes)
+                for message in class_messages
+                if message.full_size_bytes
+            ]
             summary[f"{class_name}_count"] = len(class_messages)
             summary[f"{class_name}_delivered_ratio"] = (
                 len(class_delivered) / len(class_messages) if class_messages else 0.0
             )
             summary[f"{class_name}_deadline_met_ratio"] = (
                 deadline_met / len(class_messages) if class_messages else 0.0
+            )
+            summary[f"{class_name}_deadline_missed_ratio"] = (
+                class_deadline_missed / len(class_messages) if class_messages else 0.0
+            )
+            summary[f"{class_name}_dropped_ratio"] = (
+                class_dropped / len(class_messages) if class_messages else 0.0
+            )
+            summary[f"{class_name}_loss_ratio"] = (
+                1.0 - len(class_delivered) / len(class_messages) if class_messages else 0.0
+            )
+            summary[f"{class_name}_retransmissions_total"] = class_retransmissions
+            summary[f"{class_name}_retransmission_ratio"] = (
+                class_retransmissions / len(class_messages) if class_messages else 0.0
             )
             summary[f"{class_name}_throughput_bps"] = (
                 (delivered_wire_bytes * 8.0) / self.duration_s if self.duration_s else 0.0
@@ -154,6 +243,28 @@ class MetricsCollector:
             )
             summary[f"{class_name}_latency_p95_s"] = _percentile(class_latencies, 0.95)
             summary[f"{class_name}_latency_p99_s"] = _percentile(class_latencies, 0.99)
+            summary[f"{class_name}_jitter_s"] = _jitter(class_latencies)
+            summary[f"{class_name}_classification_time_mean_s"] = (
+                statistics.mean(class_classification_times) if class_classification_times else 0.0
+            )
+            summary[f"{class_name}_crypto_time_mean_s"] = (
+                statistics.mean(class_crypto_times) if class_crypto_times else 0.0
+            )
+            summary[f"{class_name}_queue_time_mean_s"] = (
+                statistics.mean(class_queue_times) if class_queue_times else 0.0
+            )
+            summary[f"{class_name}_tx_time_mean_s"] = (
+                statistics.mean(class_tx_times) if class_tx_times else 0.0
+            )
+            summary[f"{class_name}_ack_time_mean_s"] = (
+                statistics.mean(class_ack_times) if class_ack_times else 0.0
+            )
+            summary[f"{class_name}_crypto_share_latency_ratio"] = (
+                statistics.mean(class_crypto_share_values) if class_crypto_share_values else 0.0
+            )
+            summary[f"{class_name}_security_overhead_ratio"] = (
+                statistics.mean(class_security_overhead_values) if class_security_overhead_values else 0.0
+            )
 
         return summary
 

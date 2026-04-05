@@ -1,27 +1,27 @@
 {
-  "run_id": "scenario_c_overload",
+  "run_id": "scenario_c_high",
   "scenario": "C",
   "scenario_family": "C",
-  "load_profile": "overload",
-  "seed": 104,
+  "load_profile": "high",
+  "seed": 113,
   "duration_s": 15.0,
   "queue_discipline": "drr",
   "classification_delay_s": 0.0001,
   "crypto_workers": 1,
-  "grace_period_s": 4.0,
+  "grace_period_s": 3.0,
   "channel": {
     "bandwidth_bps": 64000,
     "propagation_delay_s": 0.02,
-    "loss_probability": 0.05,
-    "buffer_size": 10
+    "loss_probability": 0.01,
+    "buffer_size": 50
   },
   "ack": {
     "delay_s": 0.01,
-    "loss_probability": 0.03
+    "loss_probability": 0.0
   },
   "aggregation": {
-    "max_messages": 3,
-    "max_payload_bytes": 1536,
+    "max_messages": 5,
+    "max_payload_bytes": 2560,
     "hold_time_s": 0.0,
     "member_overhead_bytes": 12
   },
@@ -33,21 +33,19 @@
     "backend_type": "file",
     "path": "../policies/baseline_policies.json"
   },
-  "initial_policy_version": "scenario_c_emergency",
+  "initial_policy_version": "scenario_c_priority_protected",
   "policy_updates": [],
   "replay_window_size": 64,
-  "notes": "Scenario C under overload starts in the emergency policy and constrains telemetry aggregation to reduce critical blocking.",
+  "notes": "Scenario C at sustained high load with the same offered traffic and application deadlines as A/B for fair comparison.",
   "sources": [
     {
       "source_id": "source_critical",
       "message_class": "critical",
-      "generator": "burst",
+      "generator": "periodic",
       "payload_bytes": 64,
       "dst": "receiver",
-      "deadline_s": 0.12,
-      "burst_size": 3,
-      "burst_interval_s": 3.0,
-      "intra_burst_gap_s": 0.02
+      "deadline_s": 0.15,
+      "interval_s": 1.0
     },
     {
       "source_id": "source_command",
@@ -55,8 +53,8 @@
       "generator": "periodic",
       "payload_bytes": 128,
       "dst": "receiver",
-      "deadline_s": 0.45,
-      "interval_s": 0.5
+      "deadline_s": 0.5,
+      "interval_s": 0.6
     },
     {
       "source_id": "source_telemetry",
@@ -64,8 +62,8 @@
       "generator": "poisson",
       "payload_bytes": 512,
       "dst": "receiver",
-      "deadline_s": 1.5,
-      "rate_per_sec": 8.0
+      "deadline_s": 1.2,
+      "rate_per_sec": 6.0
     },
     {
       "source_id": "source_background",
@@ -73,8 +71,8 @@
       "generator": "poisson",
       "payload_bytes": 1024,
       "dst": "receiver",
-      "deadline_s": 6.0,
-      "rate_per_sec": 3.0
+      "deadline_s": 4.0,
+      "rate_per_sec": 1.5
     }
   ]
 }

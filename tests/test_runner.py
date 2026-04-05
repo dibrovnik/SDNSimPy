@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from secure_delivery.experiments.runner import run_experiment
+from secure_delivery.experiments.runner import run_batch, run_experiment
 
 
 class ExperimentRunnerTestCase(unittest.TestCase):
@@ -68,6 +68,73 @@ class ExperimentRunnerTestCase(unittest.TestCase):
             self.assertTrue((output_dir / "messages.csv").exists())
             self.assertTrue((output_dir / "runs.csv").exists())
             self.assertGreaterEqual(result["summary"]["messages_total"], 1)
+
+    def test_run_batch_replicates_multiple_seeds(self) -> None:
+        policy_path = Path("configs/policies/baseline_policies.json").resolve()
+        config = {
+            "run_id": "batch_case",
+            "scenario": "A",
+            "scenario_family": "A",
+            "load_profile": "test",
+            "seed": 11,
+            "duration_s": 0.5,
+            "queue_discipline": "fifo",
+            "classification_delay_s": 0.0001,
+            "crypto_workers": 1,
+            "grace_period_s": 0.2,
+            "channel": {
+                "bandwidth_bps": 64000,
+                "propagation_delay_s": 0.01,
+                "loss_probability": 0.0,
+                "buffer_size": 10
+            },
+            "ack": {
+                "delay_s": 0.0,
+                "loss_probability": 0.0
+            },
+            "aggregation": {
+                "max_messages": 2,
+                "max_payload_bytes": 1024,
+                "hold_time_s": 0.0,
+                "member_overhead_bytes": 8
+            },
+            "crypto_engine": {
+                "mode": "synthetic",
+                "priority_mode": "uniform"
+            },
+            "policy_backend": {
+                "backend_type": "file",
+                "path": str(policy_path)
+            },
+            "initial_policy_version": "scenario_a_uniform_fifo",
+            "policy_updates": [],
+            "replay_window_size": 32,
+            "sources": [
+                {
+                    "source_id": "source_command",
+                    "message_class": "control",
+                    "generator": "periodic",
+                    "payload_bytes": 128,
+                    "dst": "receiver",
+                    "deadline_s": 0.5,
+                    "interval_s": 0.2
+                }
+            ]
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_dir = Path(temp_dir) / "configs"
+            config_dir.mkdir()
+            config_path = config_dir / "one.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            output_root = Path(temp_dir) / "batch"
+
+            result = run_batch(str(config_dir), str(output_root), replicates=3, seed_step=2)
+
+            self.assertEqual(len(result["runs"]), 3)
+            self.assertTrue((output_root / "batch_runs.csv").exists())
+            seeds = [item["seed"] for item in result["runs"]]
+            self.assertEqual(seeds, [11, 13, 15])
 
 
 if __name__ == "__main__":
